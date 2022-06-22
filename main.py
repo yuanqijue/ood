@@ -13,6 +13,8 @@ import matplotlib.image as mpimg
 import torch.nn.functional as F
 import torch.optim as optim
 
+# from torchsummary import summary
+
 training_data = datasets.MNIST(root="data", train=True, download=True,
                                transform=Compose([ToTensor(), Normalize((0.1307,), (0.3081,))]), )
 
@@ -30,6 +32,8 @@ test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 n_epochs = 10
 num_classes = 10
 network = ConNetwork(num_classes)
+print(network)
+
 loss_fn = ContrastiveLoss(temperature=0.07)
 optimizer = optim.SGD(network.parameters(), lr=0.01, momentum=0.5)
 

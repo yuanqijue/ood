@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torch.nn.functional as F
 
@@ -11,7 +12,7 @@ class ConNetwork(nn.Module):
         self.conv1 = nn.Sequential(nn.Conv2d(1, 16, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
         self.conv2 = nn.Sequential(nn.Conv2d(16, 32, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
 
-        self.projs = []
+        self.projs = nn.ModuleList()
 
         for i in range(num_classes):
             cls = nn.Sequential(nn.Linear(32 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 64))
@@ -28,7 +29,7 @@ class ConNetwork(nn.Module):
         out = []
         for i in range(self.num_classes):
             out.append(F.normalize(self.projs[i](x), dim=1))
-        return out
+        return torch.tensor(out)
 
 
 class LinearClassifier(nn.Module):
