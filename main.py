@@ -43,6 +43,8 @@ test_losses = []
 test_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
 
 
+# encoder
+
 def train_encoder(epoch):
     network.train()
     for batch_idx, (data, target) in enumerate(train_loader):
