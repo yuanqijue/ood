@@ -49,12 +49,12 @@ def train_encoder(epoch):
         optimizer.zero_grad()
         outputs = network(data)
         losses = 0
-        for id, output in enumerate(outputs):
-            labels = torch.eq(target, id).long()
-            loss = loss_fn(output, labels)
+        for i in range(outputs.shape[0]):
+            labels = torch.eq(target, i).long()
+            loss = loss_fn(outputs[0], labels)
             losses += loss.item()
             loss.backward(retain_graph=True)
-            if id == num_classes - 1:
+            if i == num_classes - 1:
                 loss.backward()
             else:
                 loss.backward(retain_graph=True)
@@ -84,13 +84,12 @@ def train_cls(epoch):
         with torch.no_grad():
             features = network.encoder(data)
         optimizer_classifiers.zero_grad()
-        outputs = []
+        outputs = classifier(features)
         losses = 0
-        for i in range(num_classes):
+
+        for i in range(outputs.shape[0]):
             labels = torch.eq(target, i).long()
-            output = classifier(features)
-            outputs.append(output)
-            loss = loss_fn_classifiers(output, labels)
+            loss = loss_fn_classifiers(outputs[i], labels)
             losses += loss.item()
             if i == num_classes - 1:
                 loss.backward()
@@ -124,7 +123,6 @@ def test():
 
 
 def accuracy(outputs, labels):
-    outputs = torch.tensor(outputs)
     pred_labels = torch.argmax(outputs, dim=1)
     num_corrects = torch.eq(pred_labels, labels).sum().float().item()
     return num_corrects / labels.shape[0]
