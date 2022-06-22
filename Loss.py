@@ -19,9 +19,14 @@ class ContrastiveLoss(nn.Module):
         # compute logits
         anchor_dot_contrast = torch.div(torch.matmul(features, features.T), self.temperature)
 
-        # for numerical stability
-        logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
-        logits = anchor_dot_contrast - logits_max.detach()  # todo why
+        features_norm = torch.norm(features, dim=1, keepdim=True)
+        cov_features_norm = torch.matmul(features_norm, features_norm.T)
+
+        logits = torch.div(anchor_dot_contrast, cov_features_norm)
+
+        # # for numerical stability
+        # logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
+        # logits = anchor_dot_contrast - logits_max.detach()  # todo why
 
         # mask-out self-contrast cases
         logits_mask = torch.scatter(torch.ones_like(mask), 1, torch.arange(batch_size).view(-1, 1).to(device), 0)
