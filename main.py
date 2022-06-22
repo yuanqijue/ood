@@ -46,11 +46,14 @@ def train_encoder(epoch):
         outputs = network(data)
         losses = 0
         for id, output in enumerate(outputs):
-            labels = torch.eq(target, id)
+            labels = torch.eq(target, id).long()
             loss = loss_fn(output, labels)
             losses += loss.item()
-            loss.backward()
-
+            loss.backward(retain_graph=True)
+            if id == num_classes - 1:
+                loss.backward()
+            else:
+                loss.backward(retain_graph=True)
         optimizer.step()
 
         if batch_idx % 100 == 0:
@@ -80,12 +83,15 @@ def train_cls(epoch):
         outputs = []
         losses = 0
         for i in range(num_classes):
-            labels = torch.eq(target, i)
+            labels = torch.eq(target, i).long()
             output = classifier(features)
             outputs.append(output)
             loss = loss_fn_classifiers(output, labels)
             losses += loss.item()
-            loss.backward()
+            if i == num_classes - 1:
+                loss.backward()
+            else:
+                loss.backward(retain_graph=True)
         optimizer_classifiers.step()
 
         if batch_idx % 100 == 0:

@@ -14,13 +14,13 @@ class ConNetwork(nn.Module):
         self.projs = []
 
         for i in range(num_classes):
-            cls = nn.Sequential(nn.Linear(32 * 6 * 6, 128), nn.ReLU(), nn.Linear(128, 64))
+            cls = nn.Sequential(nn.Linear(32 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 64))
             self.projs.append(cls)
 
     def encoder(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
-        x = x.view(-1, 32 * 6 * 6)
+        x = x.view(-1, 32 * 5 * 5)
         return x
 
     def forward(self, x):
