@@ -15,11 +15,11 @@ class ContrastiveLoss(nn.Module):
         losses = []
         for i, features in enumerate(preds):
             device = (torch.device('cuda') if features.is_cuda else torch.device('cpu'))
-            labels = torch.eq(target, i).long()
+            labels = torch.eq(target, i).float().to(device)
 
             batch_size = features.shape[0]
             labels = labels.contiguous().view(-1, 1)
-            mask = torch.eq(labels, labels.T).float().to(device)
+            mask = torch.logical_and(labels, labels.T).float().to(device)
 
             # compute logits
             anchor_dot_contrast = torch.div(torch.matmul(features, features.T), self.temperature)
@@ -42,10 +42,15 @@ class ContrastiveLoss(nn.Module):
             log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
 
             # compute mean of log-likelihood over positive
-            mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
+            log_prob_sum = (mask * log_prob).sum(1)
+            cardinality = mask.sum(1)
+            vid_idx = cardinality.nonzero().detach()
+            log_prob_sum = log_prob_sum[vid_idx]
+            cardinality = cardinality[vid_idx]
+            # mean_log_prob_pos = (mask * log_prob).sum(1) / mask.sum(1)
 
             # loss
-            loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
+            loss = - (self.temperature / self.base_temperature) * (log_prob_sum / cardinality)
             losses.append(loss.mean())
 
         final_loss = 0
