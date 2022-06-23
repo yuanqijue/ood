@@ -1,4 +1,5 @@
 import torch
+import math
 import torchvision
 from torch import nn
 from torch.utils.data import DataLoader
@@ -24,7 +25,8 @@ test_data = datasets.MNIST(root="data", train=False, download=True,
 print('training data length %s' % len(training_data))
 print('testing data length %s' % len(test_data))
 
-batch_size = 64
+batch_size = 256  # actual batch_size for each sub projector is almost 64
+
 # Create data loaders.
 train_loader = DataLoader(training_data, batch_size=batch_size)
 test_loader = DataLoader(test_data, batch_size=batch_size)
@@ -47,19 +49,14 @@ test_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
 def train_encoder(epoch):
     network.train()
     for batch_idx, (data, target) in enumerate(train_loader):
+
         outputs = network(data)
         loss = loss_fn(outputs, target)
+        losses = loss.item()
+        # if math.isnan(losses):
+        #     loss_fn(outputs, target)
         optimizer.zero_grad()
         loss.backward()
-        losses = loss.item()
-        print("*" * 9)
-        for i, param in enumerate(network.parameters()):
-            print(batch_idx, i, param.grad.data)
-        print("*" * 9)
-        print("#" * 9)
-        for i, param in enumerate(network.parameters()):
-            print(batch_idx, i, param)
-        print("#" * 9)
         optimizer.step()
 
         if batch_idx % 100 == 0:
