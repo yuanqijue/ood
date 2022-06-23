@@ -141,15 +141,15 @@ def accuracy(outputs, labels):
 def main():
     # for epoch in range(1, 5):
     #     train_encoder(epoch)
-    for epoch in range(1, 50):
-        train_cls(epoch)
-    plt.plot(train_cls_acc)
-    plt.xlabel('iteration')
-    plt.ylabel('accuracy')
-    plt.savefig('classifier_train_accuracy.png')
-    plt.show()
+    # for epoch in range(1, 50):
+    #     train_cls(epoch)
+    # plt.plot(train_cls_acc)
+    # plt.xlabel('iteration')
+    # plt.ylabel('accuracy')
+    # plt.savefig('classifier_train_accuracy.png')
+    # plt.show()
 
-    # test()
+    test()
 
 
 if __name__ == '__main__':
