@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import Compose, ToTensor, Normalize
 from Network import ConNetwork, LinearClassifier
-from Loss import ContrastiveLoss
+from Loss_single import ContrastiveLoss
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -26,16 +26,16 @@ print('testing data length %s' % len(test_data))
 
 batch_size = 64
 # Create data loaders.
-train_loader = DataLoader(training_data, batch_size=batch_size)
-test_loader = DataLoader(test_data, batch_size=batch_size)
+train_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
 n_epochs = 10
 num_classes = 10
 network = ConNetwork(num_classes)
 print(network)
 
-loss_fn = ContrastiveLoss(num_classes, temperature=0.07)
-optimizer = optim.Adam(network.parameters(), lr=0.0001)
+loss_fn = ContrastiveLoss(temperature=0.07)
+optimizer = optim.SGD(network.parameters(), lr=0.001, momentum=0.5)
 
 train_losses = []
 train_counter = []
@@ -48,18 +48,21 @@ def train_encoder(epoch):
     network.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         outputs = network(data)
-        loss = loss_fn(outputs, target)
+        losses = 0
         optimizer.zero_grad()
-        loss.backward()
-        losses = loss.item()
+        for i, output in enumerate(outputs):
+            labels = torch.eq(target, i).long()
+            loss = loss_fn(output, labels)
+            losses += loss.item()
+            if i == num_classes - 1:
+                loss.backward()
+            else:
+                loss.backward(retain_graph=True)
         print("*" * 9)
         for i, param in enumerate(network.parameters()):
             print(batch_idx, i, param.grad.data)
         print("*" * 9)
-        print("#" * 9)
-        for i, param in enumerate(network.parameters()):
-            print(batch_idx, i, param)
-        print("#" * 9)
+
         optimizer.step()
 
         if batch_idx % 100 == 0:

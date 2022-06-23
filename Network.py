@@ -28,8 +28,8 @@ class ConNetwork(nn.Module):
         x = self.encoder(x)
         out = []
         for i in range(self.num_classes):
-            out.append(F.normalize(self.projs[i](x), dim=1).unsqueeze(0))
-        return torch.cat(out, dim=0)
+            out.append(F.normalize(self.projs[i](x), dim=1))
+        return out
 
 
 class LinearClassifier(nn.Module):
@@ -46,5 +46,5 @@ class LinearClassifier(nn.Module):
     def forward(self, x):
         out = []
         for i in range(self.num_classes):
-            out.append(self.classifiers[i](x).unsqueeze(0), dim=1)
-        return torch.cat(out, dim=0)
+            out.append(self.classifiers[i](x).unsqueeze(0))
+        return out
