@@ -34,7 +34,7 @@ test_loader = DataLoader(test_data, batch_size=batch_size)
 n_epochs = 10
 num_classes = 10
 network = ConNetwork(num_classes)
-print(network)
+# print(network)
 
 loss_fn = ContrastiveLoss(num_classes, temperature=0.07)
 optimizer = optim.Adam(network.parameters(), lr=0.0001)
@@ -72,6 +72,10 @@ classifier = LinearClassifier(num_classes)
 loss_fn_classifiers = torch.nn.BCELoss()
 optimizer_classifiers = optim.Adam(classifier.parameters(), lr=0.001)
 
+train_cls_acc = []
+test_cls_losses = []
+test_cls_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
+
 
 def train_cls(epoch):
     network.load_state_dict(torch.load('results/model.pth'))
@@ -94,6 +98,8 @@ def train_cls(epoch):
                 loss.backward(retain_graph=True)
         optimizer_classifiers.step()
 
+        train_cls_acc.append(accuracy(outputs, target))
+
         if batch_idx % 100 == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(epoch, batch_idx * len(data),
                                                                                         len(train_loader.dataset),
@@ -101,37 +107,49 @@ def train_cls(epoch):
                                                                                             train_loader), losses,
                                                                                         accuracy(outputs, target)))
             train_losses.append(losses)
-            train_counter.append((batch_idx * 64) + ((epoch - 1) * len(train_loader.dataset)))
+            train_counter.append((batch_idx * 256) + ((epoch - 1) * len(train_loader.dataset)))
             torch.save(classifier.state_dict(), 'results/model_classifiers.pth')
             torch.save(optimizer_classifiers.state_dict(), 'results/optimizer_classifiers.pth')
 
 
 def test():
+    network.load_state_dict(torch.load('results/model.pth'))
+    classifier.load_state_dict(torch.load('results/model_classifiers.pth'))
     network.eval()
     classifier.eval()
-
-    for batch_idx, (data, target) in enumerate(test_loader):
-        outputs = []
-        with torch.no_grad():
+    correct = 0
+    with torch.no_grad():
+        for data, target in test_loader:
             features = network.encoder(data)
-            for i in range(num_classes):
-                output = classifier(features)
-                outputs.append(output)
-        print('Accuracy', accuracy(outputs, target))
+            outputs = classifier(features)
+            correct += accuracy_count(outputs, target)
+    print('\nTest set: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, len(test_loader.dataset),
+                                                           100. * correct / len(test_loader.dataset)))
 
 
-def accuracy(outputs, labels):
+def accuracy_count(outputs, labels):
     outputs = outputs.view(num_classes, -1)
     pred_labels = torch.argmax(outputs.T, dim=1)
     num_corrects = torch.eq(pred_labels, labels).sum().float().item()
-    return num_corrects / labels.shape[0]
+    return num_corrects
+
+
+def accuracy(outputs, labels):
+    return accuracy_count(outputs, labels) / labels.shape[0]
 
 
 def main():
     # for epoch in range(1, 5):
     #     train_encoder(epoch)
-    for epoch in range(1, 10):
+    for epoch in range(1, 50):
         train_cls(epoch)
+    plt.plot(train_cls_acc)
+    plt.xlabel('iteration')
+    plt.ylabel('accuracy')
+    plt.savefig('classifier_train_accuracy.png')
+    plt.show()
+
+    # test()
 
 
 if __name__ == '__main__':
