@@ -70,7 +70,7 @@ def train_encoder(epoch):
 
 classifier = LinearClassifier(num_classes)
 loss_fn_classifiers = torch.nn.BCELoss()
-optimizer_classifiers = optim.Adam(classifier.parameters(), lr=0.1)
+optimizer_classifiers = optim.Adam(classifier.parameters(), lr=0.001)
 
 
 def train_cls(epoch):
