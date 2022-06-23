@@ -53,8 +53,6 @@ def train_encoder(epoch):
         outputs = network(data)
         loss = loss_fn(outputs, target)
         losses = loss.item()
-        # if math.isnan(losses):
-        #     loss_fn(outputs, target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -71,24 +69,24 @@ def train_encoder(epoch):
 
 
 classifier = LinearClassifier(num_classes)
-loss_fn_classifiers = torch.nn.CrossEntropyLoss
-optimizer_classifiers = optim.SGD(network.parameters(), lr=0.01, momentum=0.5)
+loss_fn_classifiers = torch.nn.BCELoss()
+optimizer_classifiers = optim.Adam(network.parameters(), lr=0.1)
 
 
 def train_cls(epoch):
+    network.load_state_dict(torch.load('results/model.pth'))
     network.eval()
     classifier.train()
     for batch_idx, (data, target) in enumerate(train_loader):
-
         with torch.no_grad():
             features = network.encoder(data)
         optimizer_classifiers.zero_grad()
         outputs = classifier(features)
         losses = 0
 
-        for i in range(outputs.shape[0]):
-            labels = torch.eq(target, i).long()
-            loss = loss_fn_classifiers(outputs[i], labels)
+        for i in range(num_classes):
+            labels = torch.eq(target, i).float()
+            loss = loss_fn_classifiers(outputs[i], labels.view(-1, 1))
             losses += loss.item()
             if i == num_classes - 1:
                 loss.backward()
@@ -97,7 +95,7 @@ def train_cls(epoch):
         optimizer_classifiers.step()
 
         if batch_idx % 100 == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, batch_idx * len(data),
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(epoch, batch_idx * len(data),
                                                                            len(train_loader.dataset),
                                                                            100. * batch_idx / len(train_loader), losses,
                                                                            accuracy(outputs, target)))
@@ -122,14 +120,15 @@ def test():
 
 
 def accuracy(outputs, labels):
-    pred_labels = torch.argmax(outputs, dim=1)
+    outputs = outputs.view(num_classes, -1)
+    pred_labels = torch.argmax(outputs.T, dim=1)
     num_corrects = torch.eq(pred_labels, labels).sum().float().item()
     return num_corrects / labels.shape[0]
 
 
 def main():
-    for epoch in range(1, 5):
-        train_encoder(epoch)
+    # for epoch in range(1, 5):
+    #     train_encoder(epoch)
     for epoch in range(1, 5):
         train_cls(epoch)
 

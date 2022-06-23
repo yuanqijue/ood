@@ -37,14 +37,14 @@ class LinearClassifier(nn.Module):
 
     def __init__(self, num_classes=10):
         super(LinearClassifier, self).__init__()
-
+        self.num_classes = num_classes
         self.classifiers = nn.ModuleList()
         for i in range(num_classes):
-            cls = nn.Sequential(nn.Linear(32 * 6 * 6, 128), nn.ReLU(), nn.Linear(128, 1), nn.Sigmoid())
+            cls = nn.Sequential(nn.Linear(32 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 1), nn.Sigmoid())
             self.classifiers.append(cls)
 
     def forward(self, x):
         out = []
         for i in range(self.num_classes):
             out.append(self.classifiers[i](x).unsqueeze(0))
-        return out
+        return torch.cat(out, dim=0)
