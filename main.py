@@ -70,7 +70,7 @@ def train_encoder(epoch):
 
 classifier = LinearClassifier(num_classes)
 loss_fn_classifiers = torch.nn.BCELoss()
-optimizer_classifiers = optim.Adam(network.parameters(), lr=0.1)
+optimizer_classifiers = optim.Adam(classifier.parameters(), lr=0.1)
 
 
 def train_cls(epoch):
@@ -96,9 +96,10 @@ def train_cls(epoch):
 
         if batch_idx % 100 == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(epoch, batch_idx * len(data),
-                                                                           len(train_loader.dataset),
-                                                                           100. * batch_idx / len(train_loader), losses,
-                                                                           accuracy(outputs, target)))
+                                                                                        len(train_loader.dataset),
+                                                                                        100. * batch_idx / len(
+                                                                                            train_loader), losses,
+                                                                                        accuracy(outputs, target)))
             train_losses.append(losses)
             train_counter.append((batch_idx * 64) + ((epoch - 1) * len(train_loader.dataset)))
             torch.save(classifier.state_dict(), 'results/model_classifiers.pth')
@@ -129,7 +130,7 @@ def accuracy(outputs, labels):
 def main():
     # for epoch in range(1, 5):
     #     train_encoder(epoch)
-    for epoch in range(1, 5):
+    for epoch in range(1, 10):
         train_cls(epoch)
 
 
