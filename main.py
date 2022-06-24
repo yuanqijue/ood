@@ -206,7 +206,8 @@ def main():
     # train_encoder()
     # train_cls()
 
-    test()  # print('error count', np.array(ood_error).sum())
+    test() #97.9300%
+    # print('error count', np.array(ood_error).sum())
 
 
 if __name__ == '__main__':
