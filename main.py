@@ -1,5 +1,5 @@
 import torch
-import math
+import numpy as np
 import torchvision
 from torch import nn
 from torch.utils.data import DataLoader
@@ -22,8 +22,8 @@ training_data = datasets.MNIST(root="data", train=True, download=True,
 # Download test data from open datasets.
 test_data = datasets.MNIST(root="data", train=False, download=True,
                            transform=Compose([ToTensor(), Normalize((0.1307,), (0.3081,))]), )
-print('training data length %s' % len(training_data))
-print('testing data length %s' % len(test_data))
+# print('training data length %s' % len(training_data))
+# print('testing data length %s' % len(test_data))
 
 batch_size = 256  # actual batch_size for each sub projector is almost 64
 
@@ -31,7 +31,7 @@ batch_size = 256  # actual batch_size for each sub projector is almost 64
 train_loader = DataLoader(training_data, batch_size=batch_size)
 test_loader = DataLoader(test_data, batch_size=batch_size)
 
-n_epochs = 10
+n_epochs = 20
 num_classes = 10
 network = ConNetwork(num_classes)
 # print(network)
@@ -40,76 +40,132 @@ loss_fn = ContrastiveLoss(num_classes, temperature=0.07)
 optimizer = optim.Adam(network.parameters(), lr=0.0001)
 
 train_losses = []
-train_counter = []
-test_losses = []
-test_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
 
 
 # encoder
-def train_encoder(epoch):
-    network.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-
-        outputs = network(data)
-        loss = loss_fn(outputs, target)
-        losses = loss.item()
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        if batch_idx % 100 == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, batch_idx * len(data),
-                                                                           len(train_loader.dataset),
-                                                                           100. * batch_idx / len(train_loader),
-                                                                           losses))
+def train_encoder():
+    for epoch in range(1, n_epochs + 1):
+        network.train()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            outputs = network(data)
+            loss = loss_fn(outputs, target)
+            losses = loss.item()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
             train_losses.append(losses)
-            train_counter.append((batch_idx * 64) + ((epoch - 1) * len(train_loader.dataset)))
-            torch.save(network.state_dict(), 'results/model.pth')
-            torch.save(optimizer.state_dict(), 'results/optimizer.pth')
+
+            if batch_idx % 100 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, batch_idx * len(data),
+                                                                               len(train_loader.dataset),
+                                                                               100. * batch_idx / len(train_loader),
+                                                                               losses))
+                torch.save(network.state_dict(), 'results/model.pth')
+                torch.save(optimizer.state_dict(), 'results/optimizer.pth')
+    plt.plot(train_losses, label="train")
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.savefig('encoder_train_loss.png')
+    plt.show()
 
 
 classifier = LinearClassifier(num_classes)
 loss_fn_classifiers = torch.nn.BCELoss()
+
+# Initialize optimizer
 optimizer_classifiers = optim.Adam(classifier.parameters(), lr=0.001)
 
 train_cls_acc = []
-test_cls_losses = []
-test_cls_counter = [i * len(train_loader.dataset) for i in range(n_epochs + 1)]
+val_cls_acc = []
+train_cls_losses = []
+val_cls_losses = []
 
+from sklearn.model_selection import KFold
 
-def train_cls(epoch):
-    network.load_state_dict(torch.load('results/model.pth'))
-    network.eval()
-    classifier.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        with torch.no_grad():
-            features = network.encoder(data)
-        optimizer_classifiers.zero_grad()
-        outputs = classifier(features)
-        losses = 0
+k_folds = 5
 
-        for i in range(num_classes):
-            labels = torch.eq(target, i).float()
-            loss = loss_fn_classifiers(outputs[i], labels.view(-1, 1))
-            losses += loss.item()
-            if i == num_classes - 1:
-                loss.backward()
-            else:
-                loss.backward(retain_graph=True)
-        optimizer_classifiers.step()
+def train_cls():
+    # Define the K-fold Cross Validator
+    kfold = KFold(n_splits=k_folds, shuffle=True)
 
-        train_cls_acc.append(accuracy(outputs, target))
+    # K-fold Cross Validation model evaluation
+    for fold, (train_ids, test_ids) in enumerate(kfold.split(training_data)):
+        print(f'FOLD {fold}')
+        print('--------------------------------')
+        train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+        test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
+        trainloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, sampler=train_subsampler)
+        testloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, sampler=test_subsampler)
 
-        if batch_idx % 100 == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(epoch, batch_idx * len(data),
-                                                                                        len(train_loader.dataset),
-                                                                                        100. * batch_idx / len(
-                                                                                            train_loader), losses,
-                                                                                        accuracy(outputs, target)))
-            train_losses.append(losses)
-            train_counter.append((batch_idx * 256) + ((epoch - 1) * len(train_loader.dataset)))
+        # Init the neural network
+        network.load_state_dict(torch.load('results/model.pth'))
+        network.eval()
+        classifier.train()
+
+        # Run the training loop for defined number of epochs
+        for epoch in range(0, n_epochs):
+            # Print epoch
+            print(f'Starting epoch {epoch + 1}')
+            # Set current loss value
+            current_loss = 0.0
+            correct_count = 0
+            # Iterate over the DataLoader for training data
+            iterate_count, total = 0, 0
+            for j, (data, target) in enumerate(trainloader):
+                iterate_count += 1
+                with torch.no_grad():
+                    features = network.encoder(data)
+                optimizer_classifiers.zero_grad()
+                outputs = classifier(features)
+                losses = 0
+                total += target.size(0)
+                for i in range(num_classes):
+                    labels = torch.eq(target, i).float()
+                    loss = loss_fn_classifiers(outputs[i], labels.view(-1, 1))
+                    losses += loss.item()
+                    if i == num_classes - 1:
+                        loss.backward()
+                    else:
+                        loss.backward(retain_graph=True)
+                optimizer_classifiers.step()
+                current_loss += losses
+                correct_count += accuracy_count(outputs, target)
+
+            train_cls_acc.append(correct_count / total)
+            train_cls_losses.append(current_loss / iterate_count)
+            # Saving the model
             torch.save(classifier.state_dict(), 'results/model_classifiers.pth')
             torch.save(optimizer_classifiers.state_dict(), 'results/optimizer_classifiers.pth')
+
+            # Evaluation for this fold
+            correct, total = 0, 0
+            with torch.no_grad():
+                # Iterate over the test data and generate predictions
+                for i, (data, target) in enumerate(testloader):
+                    features = network.encoder(data)
+                    outputs = classifier(features)
+                    # Set total and correct
+                    total += target.size(0)
+                    correct += accuracy_count(outputs, target)
+
+            val_cls_acc.append(correct / total)
+            # Print accuracy
+            print('Accuracy for fold {}: {:.4f} \n'.format(fold, 100.0 * correct / total))
+    plt.plot(train_cls_acc, label="train")
+    plt.plot(val_cls_acc, label='val')
+    plt.xlabel('iteration')
+    plt.ylabel('accuracy')
+    plt.legend()
+    plt.savefig('classifier_train_accuracy.png')
+    plt.show()
+
+    plt.plot(train_cls_losses, label="train")
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.savefig('classifier_train_loss.png')
+    plt.show()
 
 
 def test():
@@ -123,14 +179,22 @@ def test():
             features = network.encoder(data)
             outputs = classifier(features)
             correct += accuracy_count(outputs, target)
-    print('\nTest set: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, len(test_loader.dataset),
+    print('\nTest set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, len(test_loader.dataset),
                                                            100. * correct / len(test_loader.dataset)))
 
 
+ood_error = []
+
+
 def accuracy_count(outputs, labels):
-    outputs = outputs.view(num_classes, -1)
-    pred_labels = torch.argmax(outputs.T, dim=1)
-    num_corrects = torch.eq(pred_labels, labels).sum().float().item()
+    outputs = outputs.view(num_classes, -1).T
+    outputs = torch.round(outputs)
+    one_tensor = torch.eq(outputs, 1).long()
+    count_one_tensor = torch.count_nonzero(one_tensor, dim=1)
+    index_samples = ((count_one_tensor == 1).nonzero(as_tuple=True)[0])
+    ood_error.append(outputs.shape[0] - len(index_samples))
+    pred_labels = torch.argmax(outputs[index_samples], dim=1)
+    num_corrects = torch.eq(pred_labels, labels[index_samples]).sum().float().item()
     return num_corrects
 
 
@@ -139,17 +203,10 @@ def accuracy(outputs, labels):
 
 
 def main():
-    # for epoch in range(1, 5):
-    #     train_encoder(epoch)
-    # for epoch in range(1, 50):
-    #     train_cls(epoch)
-    # plt.plot(train_cls_acc)
-    # plt.xlabel('iteration')
-    # plt.ylabel('accuracy')
-    # plt.savefig('classifier_train_accuracy.png')
-    # plt.show()
+    # train_encoder()
+    # train_cls()
 
-    test()
+    test()  # print('error count', np.array(ood_error).sum())
 
 
 if __name__ == '__main__':
