@@ -206,8 +206,8 @@ def main():
     # train_encoder()
     # train_cls()
 
-    test() #97.9300%
-    # print('error count', np.array(ood_error).sum())
+    test() #97.9300% 165个存在多个分类，42个分类错误
+    print('error count', np.array(ood_error).sum())
 
 
 if __name__ == '__main__':
