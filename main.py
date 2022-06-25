@@ -31,7 +31,6 @@ batch_size = 256  # actual batch_size for each sub projector is almost 64
 train_loader = DataLoader(training_data, batch_size=batch_size)
 test_loader = DataLoader(test_data, batch_size=batch_size)
 
-n_epochs = 20
 num_classes = 10
 network = ConNetwork(num_classes)
 # print(network)
@@ -44,7 +43,8 @@ train_losses = []
 
 # encoder
 def train_encoder():
-    for epoch in range(1, n_epochs + 1):
+    n_encoder_epochs = 5
+    for epoch in range(1, n_encoder_epochs + 1):
         network.train()
         for batch_idx, (data, target) in enumerate(train_loader):
             outputs = network(data)
@@ -85,9 +85,11 @@ from sklearn.model_selection import KFold
 
 k_folds = 5
 
+
 def train_cls():
     # Define the K-fold Cross Validator
     kfold = KFold(n_splits=k_folds, shuffle=True)
+    n_cls_epochs = 10
 
     # K-fold Cross Validation model evaluation
     for fold, (train_ids, test_ids) in enumerate(kfold.split(training_data)):
@@ -104,7 +106,7 @@ def train_cls():
         classifier.train()
 
         # Run the training loop for defined number of epochs
-        for epoch in range(0, n_epochs):
+        for epoch in range(0, n_cls_epochs):
             # Print epoch
             print(f'Starting epoch {epoch + 1}')
             # Set current loss value
@@ -178,7 +180,7 @@ def test():
         for data, target in test_loader:
             features = network.encoder(data)
             outputs = classifier(features)
-            correct += accuracy_count(outputs, target)
+            correct += accuracy_count(outputs, target, data)
     print('\nTest set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, len(test_loader.dataset),
                                                            100. * correct / len(test_loader.dataset)))
 
@@ -186,7 +188,7 @@ def test():
 ood_error = []
 
 
-def accuracy_count(outputs, labels):
+def accuracy_count(outputs, labels, data=None):
     outputs = outputs.view(num_classes, -1).T
     outputs = torch.round(outputs)
     one_tensor = torch.eq(outputs, 1).long()
@@ -195,6 +197,10 @@ def accuracy_count(outputs, labels):
     ood_error.append(outputs.shape[0] - len(index_samples))
     pred_labels = torch.argmax(outputs[index_samples], dim=1)
     num_corrects = torch.eq(pred_labels, labels[index_samples]).sum().float().item()
+
+    if data:
+        error_index_samples = ((count_one_tensor != 1).nonzero(as_tuple=True)[0])
+
     return num_corrects
 
 
@@ -206,7 +212,7 @@ def main():
     # train_encoder()
     # train_cls()
 
-    test() #97.9300% 165个存在多个分类，42个分类错误
+    test()  # 97.9300% 165个存在多个分类，42个分类错误
     print('error count', np.array(ood_error).sum())
 
 
