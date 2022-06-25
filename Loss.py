@@ -17,28 +17,28 @@ class ContrastiveLoss(nn.Module):
         for i, features in enumerate(preds):
             batch_size = target.shape[0]
 
-            labels = target.numpy()
-            idx = np.where(target == i)[0]
-            each_class = batch_size / self.num_classes
-            div_scale = each_class // (each_class / (self.num_classes - 1))
-            div_scale = int(div_scale - 1)
-
-            for j in range(self.num_classes):
-                if j == i:
-                    continue
-                sub_idx = np.where(labels == j)[0]
-                np.random.shuffle(sub_idx)
-
-                if len(sub_idx) > div_scale:
-                    sub_idx = sub_idx[:round(len(sub_idx) / div_scale)]
-                idx = np.concatenate((idx, sub_idx), axis=0)
-
-            size = len(idx)
-            labels = target[idx]
-            features = features[idx]
+            # labels = target.numpy()
+            # idx = np.where(target == i)[0]
+            # each_class = batch_size / self.num_classes
+            # div_scale = each_class // (each_class / (self.num_classes - 1))
+            # div_scale = int(div_scale - 1)
+            #
+            # for j in range(self.num_classes):
+            #     if j == i:
+            #         continue
+            #     sub_idx = np.where(labels == j)[0]
+            #     np.random.shuffle(sub_idx)
+            #
+            #     if len(sub_idx) > div_scale:
+            #         sub_idx = sub_idx[:round(len(sub_idx) / div_scale)]
+            #     idx = np.concatenate((idx, sub_idx), axis=0)
+            #
+            # size = len(idx)
+            # labels = target[idx]
+            # features = features[idx]
 
             device = (torch.device('cuda') if features.is_cuda else torch.device('cpu'))
-            # labels = torch.eq(labels, i).float().to(device)
+            labels = torch.eq(target, i).float().to(device)
 
             labels = labels.contiguous().view(-1, 1)
             mask = torch.logical_and(labels, labels.T).float().to(device)
@@ -46,17 +46,18 @@ class ContrastiveLoss(nn.Module):
             # compute logits
             anchor_dot_contrast = torch.div(torch.matmul(features, features.T), self.temperature)
 
-            features_norm = torch.norm(features, dim=1, keepdim=True)
-            cov_features_norm = torch.matmul(features_norm, features_norm.T)
+            # In last layer, the L2 normalization has done
+            # features_norm = torch.norm(features, dim=1, keepdim=True)
+            # cov_features_norm = torch.matmul(features_norm, features_norm.T)
+            #
+            # logits = torch.div(anchor_dot_contrast, cov_features_norm)
 
-            logits = torch.div(anchor_dot_contrast, cov_features_norm)
-
-            # # for numerical stability
-            # logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
-            # logits = anchor_dot_contrast - logits_max.detach()  # todo why
+            # for numerical stability
+            logits_max, _ = torch.max(anchor_dot_contrast, dim=1, keepdim=True)
+            logits = anchor_dot_contrast - logits_max.detach()  # todo why
 
             # mask-out self-contrast cases
-            logits_mask = torch.scatter(torch.ones_like(mask), 1, torch.arange(size).view(-1, 1).to(device), 0)
+            logits_mask = torch.scatter(torch.ones_like(mask), 1, torch.arange(batch_size).view(-1, 1).to(device), 0)
             mask = mask * logits_mask
 
             # compute log_prob
