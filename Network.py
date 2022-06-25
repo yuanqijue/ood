@@ -9,19 +9,19 @@ class ConNetwork(nn.Module):
     def __init__(self, num_classes):
         super(ConNetwork, self).__init__()
         self.num_classes = num_classes
-        self.conv1 = nn.Sequential(nn.Conv2d(1, 16, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
-        self.conv2 = nn.Sequential(nn.Conv2d(16, 32, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
+        self.conv1 = nn.Sequential(nn.Conv2d(1, 64, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
+        self.conv2 = nn.Sequential(nn.Conv2d(64, 128, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
 
         self.projs = nn.ModuleList()
 
         for i in range(num_classes):
-            cls = nn.Sequential(nn.Linear(32 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 64))
+            cls = nn.Sequential(nn.Linear(128 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 64))
             self.projs.append(cls)
 
     def encoder(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
-        x = x.view(-1, 32 * 5 * 5)
+        x = x.view(-1, 128 * 5 * 5)
         return x
 
     def forward(self, x):
@@ -40,7 +40,7 @@ class LinearClassifier(nn.Module):
         self.num_classes = num_classes
         self.classifiers = nn.ModuleList()
         for i in range(num_classes):
-            cls = nn.Sequential(nn.Linear(32 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 1), nn.Sigmoid())
+            cls = nn.Sequential(nn.Linear(128 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 1), nn.Sigmoid())
             self.classifiers.append(cls)
 
     def forward(self, x):

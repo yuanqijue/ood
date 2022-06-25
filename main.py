@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torchvision
 from torch import nn
+from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import Compose, ToTensor, Normalize
@@ -43,7 +44,7 @@ train_losses = []
 
 # encoder
 def train_encoder():
-    n_encoder_epochs = 5
+    n_encoder_epochs = 10
     for epoch in range(1, n_encoder_epochs + 1):
         network.train()
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -169,8 +170,13 @@ def train_cls():
     plt.savefig('classifier_train_loss.png')
     plt.show()
 
+import os
+import glob
 
 def test():
+    files = glob.glob('wrong_imgs/*')
+    for f in files:
+        os.remove(f)
     network.load_state_dict(torch.load('results/model.pth'))
     classifier.load_state_dict(torch.load('results/model_classifiers.pth'))
     network.eval()
@@ -198,9 +204,19 @@ def accuracy_count(outputs, labels, data=None):
     pred_labels = torch.argmax(outputs[index_samples], dim=1)
     num_corrects = torch.eq(pred_labels, labels[index_samples]).sum().float().item()
 
-    if data:
+    if debug and type(data) != type(None):
         error_index_samples = ((count_one_tensor != 1).nonzero(as_tuple=True)[0])
+        error_imgs = data[error_index_samples]
+        print('Detecting {} error images'.format(len(error_index_samples)))
 
+        for show_index, img in enumerate(error_imgs):
+            show_label_index = error_index_samples[show_index]
+            pred_labels = ((outputs[show_label_index] == 1).nonzero(as_tuple=True)[0])
+            im = Image.fromarray((error_imgs[show_index][0].numpy()*0.3081+0.1307)*255).convert('L')
+            im.save("wrong_imgs/Actual label is {}, Pred label is {}.png".format(labels[show_label_index], pred_labels.numpy()))
+            # print('Actual label is {}, Pred label is {}'.format(labels[show_label_index], pred_labels))
+            # plt.imshow(error_imgs[show_index][0], cmap='gray', interpolation='none')
+            # plt.show()
     return num_corrects
 
 
@@ -208,12 +224,19 @@ def accuracy(outputs, labels):
     return accuracy_count(outputs, labels) / labels.shape[0]
 
 
+import time
+
+debug = True
+
+
 def main():
+    print('Start Time', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     # train_encoder()
     # train_cls()
 
     test()  # 97.9300% 165个存在多个分类，42个分类错误
-    print('error count', np.array(ood_error).sum())
+    # 优化后 98.6900% 131个异常图片中，存在多个分类或者有32个
+    print('End Time', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
 
 if __name__ == '__main__':
