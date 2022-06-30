@@ -12,7 +12,7 @@ class ConNetwork(nn.Module):
         self.conv1 = nn.Sequential(nn.Conv2d(1, 64, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
         self.conv2 = nn.Sequential(nn.Conv2d(64, 128, kernel_size=3), nn.ReLU(), nn.MaxPool2d(2))
 
-        self.projector = nn.Sequential(nn.Linear(128 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 64))
+        self.projector = nn.Sequential(nn.Linear(128 * 5 * 5, 128), nn.ReLU(), nn.Linear(128, 128))
 
     def encoder(self, x):
         x = self.conv1(x)
