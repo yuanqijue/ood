@@ -118,7 +118,7 @@ k_folds = 5
 def train_cls():
     # Define the K-fold Cross Validator
     kfold = KFold(n_splits=k_folds, shuffle=True)
-    n_cls_epochs = 5
+    n_cls_epochs = 10
 
     # K-fold Cross Validation model evaluation
     for fold, (train_ids, test_ids) in enumerate(kfold.split(classifier_training_data)):
@@ -261,7 +261,7 @@ def main():
     print('Start Time', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     # train_encoder()
     train_cls()
-    test()  # 98.5500%
+    test()  # 98.5600%，103个存在多分类，
     print('End Time', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
 
