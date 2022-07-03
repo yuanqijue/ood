@@ -201,15 +201,12 @@ def test_multi():
             feature_log_pdfs = np.array(feature_pdfs)
             # feature_log_pdfs[feature_log_pdfs < threshold] = np.NINF
 
-            pre_labels = np.argmax(feature_log_pdfs, axis=0)
-            correct += np.count_nonzero(pre_labels == target.numpy())
-
-            # for i in range(feature_log_pdfs.shape[1]):
-            #     if np.count_nonzero(feature_log_pdfs[:, i] == 1) == num_classes:
-            #         continue
-            #     pre_label = np.argmax(feature_log_pdfs[:, i])
-            #     if pre_label == target[i]:
-            #         correct += 1
+            for i in range(feature_log_pdfs.shape[1]):
+                if np.count_nonzero(feature_log_pdfs[:, i] == 1) == num_classes:
+                    continue
+                pre_label = np.argmax(feature_log_pdfs[:, i])
+                if pre_label == target[i]:
+                    correct += 1
     print('\nTest mnist set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, total, 100. * correct / total))
 
 
