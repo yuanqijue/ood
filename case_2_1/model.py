@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 from torch import Tensor
 from typing import List, Callable, Union, Any, TypeVar, Tuple
+import numpy as np
+from scipy.stats import norm
 
 
 class VAE(nn.Module):
@@ -120,9 +122,7 @@ class VAE(nn.Module):
 
         loss = recons_loss + kld_weight * kld_loss + con_loss
         return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach(),
-                'Contrastive_loss': con_loss}
-        # loss = recons_loss + kld_weight * kld_loss
-        # return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
+                'Contrastive_loss': con_loss}  # loss = recons_loss + kld_weight * kld_loss  # return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
 
     def contrastive_loss(self, features, labels, temperature, base_temperature):
         batch_size = labels.shape[0]
@@ -161,6 +161,53 @@ class VAE(nn.Module):
 
         loss = - (temperature / base_temperature) * (mask * log_prob).sum(1) / mask.sum(1)
         return loss.mean()
+
+    def log_px_z(self, x_hats, logscale, x):
+        # todo
+        scale = torch.exp(logscale)
+        log_px_z_array = []
+        for x_hat in x_hats:
+            mean = x_hat
+            dist = torch.distributions.Normal(mean, scale)
+            # measure prob of seeing image under p(x|z)
+            log_px_z = dist.log_prob(x)
+            log_px_z_array.append(log_px_z.sum(dim=(1, 2, 3)))
+        sample_size = len(log_px_z_array)
+        log_px_z_array = torch.cat(log_px_z_array, dim=0)
+        log_px_z_array = log_px_z_array.view(sample_size, -1)
+        log_px_z_array = torch.swapaxes(log_px_z_array, 0, 1)
+        return log_px_z_array.numpy()
+
+    def z_x_samples(self, x, num_samples):
+        [mu, log_var] = self.encode(x)
+        z_samples = []
+        log_qz = []
+
+        for m, s in zip(mu, log_var):
+            z_vals = [np.random.normal(m[i], np.exp(0.5 * s[i]), num_samples) for i in range(len(m))]
+            log_qz_vals = [norm.logpdf(z_vals[i], loc=m[i], scale=np.exp(0.5 * s[i])) for i in range(len(z_vals))]
+            z_samples.append(z_vals)
+            log_qz.append(log_qz_vals)
+        z_samples = np.array(z_samples)
+        log_pz = norm.logpdf(z_samples)
+        log_pz = log_pz.sum(axis=2)
+        log_qz_x = np.array(log_qz)
+        log_qz_x = log_qz_x.sum(axis=2)
+        return z_samples, log_pz, log_qz_x
+
+    def marginal_likelihood(self, x, num_samples):
+        log_scale = nn.Parameter(torch.Tensor([0.0]))
+        z_samples, log_pz, log_qz_x = self.z_x_samples(x, num_samples)
+
+        z_samples = torch.tensor(z_samples, dtype=torch.float)
+        z_samples = z_samples.view(-1, self.latent_dim)
+        x_hat = self.decode(z_samples)
+        x_hat = x_hat.view(x.shape[0], num_samples, x.shape[1], x.shape[2], x.shape[3])
+        x_hat = torch.swapaxes(x_hat, 0, 1)
+        log_pxz = self.log_px_z(x_hat, log_scale, x)
+
+        log_px = log_pxz + log_pz - log_qz_x
+        return np.mean(log_px, axis=1)
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         """

@@ -16,6 +16,7 @@ from pytorch_lightning.plugins import DDPPlugin
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 from torchvision.transforms import Compose, ToTensor, Normalize
+from torch.nn import functional as F
 
 parser = argparse.ArgumentParser(description='Generic runner for VAE models')
 
@@ -36,7 +37,7 @@ tb_logger = TensorBoardLogger(save_dir=config['logging_params']['save_dir'], nam
 seed_everything(config['exp_params']['manual_seed'], True)
 
 model = VAE(**config['model_params'])
-path = 'logs/VAE_CL/version_39/checkpoints/last.ckpt'
+path = 'logs/VAE_CL/version_40/checkpoints/last.ckpt'
 experiment = VAEXperiment.load_from_checkpoint(checkpoint_path=path, vae_model=model, params=config['exp_params'])
 network = experiment.model
 network.eval()
@@ -47,15 +48,16 @@ test_data = datasets.MNIST(root="../data", train=False, download=True,
 test_loader = DataLoader(test_data, batch_size=batch_size)
 
 threshold = 0
+num_samples = 128
 
 correct, total = 0, 0
 with torch.no_grad():
     for data, target in test_loader:
         total += target.shape[0]
-        features = network(data)[0]
-        pr_x = features.view(batch_size, -1)
-        p = pr_x.sum(dim=1)
-        torch.exp(p)
+        # args = network(data)
+
+        px = network.marginal_likelihood(data, num_samples)
+        print(px)
 
 print('\nTest mnist set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, total, 100. * correct / total))
 
