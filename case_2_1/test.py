@@ -43,6 +43,10 @@ network = experiment.model
 network.eval()
 
 batch_size = config['data_params']['val_batch_size']
+train_data = datasets.MNIST(root="../data", train=True, download=True,
+                            transform=Compose([ToTensor(), Normalize((0.1307,), (0.3081,))]), )
+train_loader = DataLoader(train_data, batch_size=batch_size)
+
 test_data = datasets.MNIST(root="../data", train=False, download=True,
                            transform=Compose([ToTensor(), Normalize((0.1307,), (0.3081,))]), )
 test_loader = DataLoader(test_data, batch_size=batch_size)
@@ -50,13 +54,23 @@ test_loader = DataLoader(test_data, batch_size=batch_size)
 threshold = 0
 num_samples = 128
 
+train_max_log_px = -793.9294311346123
+
+# with torch.no_grad():
+#     for data, target in train_loader:
+#         log_px = network.log_marginal_likelihood(data, num_samples)
+#         max_log_px = np.max(log_px)
+#         if max_log_px > train_max_log_px:
+#             train_max_log_px = max_log_px
+
+print('Maximum log p(x) is:', train_max_log_px)
+
 correct, total = 0, 0
 with torch.no_grad():
     for data, target in test_loader:
         total += target.shape[0]
-        # args = network(data)
-
-        px = network.marginal_likelihood(data, num_samples)
+        log_px = network.log_marginal_likelihood(data, num_samples)
+        px = network.marginal_likelihood(log_px, train_max_log_px)
         print(px)
 
 print('\nTest mnist set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, total, 100. * correct / total))

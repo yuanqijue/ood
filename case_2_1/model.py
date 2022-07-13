@@ -162,9 +162,9 @@ class VAE(nn.Module):
         loss = - (temperature / base_temperature) * (mask * log_prob).sum(1) / mask.sum(1)
         return loss.mean()
 
-    def log_px_z(self, x_hats, logscale, x):
-        # todo
-        scale = torch.exp(logscale)
+    def log_px_z(self, x_hats, x):
+        log_scale = nn.Parameter(torch.Tensor([0.0]))
+        scale = torch.exp(log_scale)
         log_px_z_array = []
         for x_hat in x_hats:
             mean = x_hat
@@ -195,19 +195,21 @@ class VAE(nn.Module):
         log_qz_x = log_qz_x.sum(axis=2)
         return z_samples, log_pz, log_qz_x
 
-    def marginal_likelihood(self, x, num_samples):
-        log_scale = nn.Parameter(torch.Tensor([0.0]))
+    def log_marginal_likelihood(self, x, num_samples):
         z_samples, log_pz, log_qz_x = self.z_x_samples(x, num_samples)
-
         z_samples = torch.tensor(z_samples, dtype=torch.float)
         z_samples = z_samples.view(-1, self.latent_dim)
         x_hat = self.decode(z_samples)
         x_hat = x_hat.view(x.shape[0], num_samples, x.shape[1], x.shape[2], x.shape[3])
         x_hat = torch.swapaxes(x_hat, 0, 1)
-        log_pxz = self.log_px_z(x_hat, log_scale, x)
+        log_pxz = self.log_px_z(x_hat, x)
 
         log_px = log_pxz + log_pz - log_qz_x
-        return np.mean(log_px, axis=1)
+        return log_px
+
+    def marginal_likelihood(self, log_px, max_log_px):
+        scaled_log_px = np.clip(log_px - max_log_px, None, 0)
+        return np.mean(scaled_log_px, axis=1)
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         """
