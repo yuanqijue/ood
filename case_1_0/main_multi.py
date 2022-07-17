@@ -202,7 +202,7 @@ def test_multi():
             # feature_log_pdfs[feature_log_pdfs < threshold] = np.NINF
 
             for i in range(feature_log_pdfs.shape[1]):
-                if np.count_nonzero(feature_log_pdfs[:, i] == 1) == num_classes:
+                if np.count_nonzero(feature_log_pdfs[:, i] == np.NINF) == num_classes:
                     continue
                 pre_label = np.argmax(feature_log_pdfs[:, i])
                 if pre_label == target[i]:

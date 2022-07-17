@@ -12,9 +12,11 @@ class VAE(nn.Module):
     reference https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
     """
 
-    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List = None, **kwargs) -> None:
+    def __init__(self, in_channels: int, latent_dim: int, hidden_dims: List = None, con_l: bool = False,
+                 **kwargs) -> None:
         super(VAE, self).__init__()
         self.latent_dim = latent_dim
+        self.con_l = con_l
         modules = []
         if hidden_dims is None:
             hidden_dims = [32, 64, 128, 256, 512]
@@ -43,9 +45,9 @@ class VAE(nn.Module):
         self.decoder = nn.Sequential(*modules)
 
         self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=0),
+            nn.ConvTranspose2d(hidden_dims[-1], hidden_dims[-1], kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(hidden_dims[-1]), nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels=1, kernel_size=4, padding=0), nn.Tanh())
+            nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1), nn.Tanh())
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -113,21 +115,18 @@ class VAE(nn.Module):
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
 
-        bsz = labels.shape[0]
-        # features = recons.view(bsz * 2, -1)  # using result to calculate
-        # f1, f2 = torch.split(z, [bsz, bsz], dim=0) # 对应version_39的结果
-        f1, f2 = torch.split(mu, [bsz, bsz], dim=0) # 对应version_42的结果
-        features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)  # batch_size,2,projector
-
-        con_loss = self.contrastive_loss(features, labels, 0.07, 0.07)
-
-        # version_43未包含con_loss
-        # loss = recons_loss + kld_weight * kld_loss
-        # return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
-
-        loss = recons_loss + kld_weight * kld_loss + con_loss
-        return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach(),
-                'Contrastive_loss': con_loss}
+        if self.con_l:
+            batch_size = labels.shape[0]
+            f1, f2 = torch.split(mu, [batch_size, batch_size], dim=0)  # cl apply on mu
+            # f1, f2 = torch.split(z, [batch_size, batch_size], dim=0) # cl apply on z
+            features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)  # batch_size,2,projector
+            con_loss = self.contrastive_loss(features, labels, 0.07, 0.07)
+            loss = recons_loss + kld_weight * kld_loss + con_loss
+            return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach(),
+                    'Contrastive_loss': con_loss}
+        else:
+            loss = recons_loss + kld_weight * kld_loss
+            return {'loss': loss, 'Reconstruction_Loss': recons_loss.detach(), 'KLD': -kld_loss.detach()}
 
     def contrastive_loss(self, features, labels, temperature, base_temperature):
         batch_size = labels.shape[0]
@@ -200,7 +199,7 @@ class VAE(nn.Module):
         log_qz_x = log_qz_x.sum(axis=2)
         return z_samples, log_pz, log_qz_x
 
-    def log_marginal_likelihood(self, x, num_samples):
+    def log_px(self, x, num_samples):
         z_samples, log_pz, log_qz_x = self.z_x_samples(x, num_samples)
         z_samples = torch.tensor(z_samples, dtype=torch.float)
         z_samples = z_samples.view(-1, self.latent_dim)
@@ -211,10 +210,6 @@ class VAE(nn.Module):
 
         log_px = log_pxz + log_pz - log_qz_x
         return np.mean(log_px, axis=1)
-
-    # def marginal_likelihood(self, log_px, max_log_px):
-    #     scaled_log_px = np.clip(log_px - max_log_px, None, 0)
-    #     return np.mean(scaled_log_px, axis=1)
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         """

@@ -1,27 +1,28 @@
 model_params:
-  name: 'VAE_CL'
-  in_channels: 1
+  name: 'VAE_CL_CIFAR10'
+  in_channels: 3
   hidden_dims: [ 32,64,128,265 ]
   latent_dim: 128
+  con_l : True
 
 data_params:
-  data_path: "../data/"
+  data_path: "data/"
   train_batch_size: 64
   val_batch_size: 64
   patch_size: 64
-  num_workers: 0
+  num_workers: 12
 
 
 exp_params:
   LR: 0.001
   weight_decay: 0.0
-  #  scheduler_gamma: 0.95
+  scheduler_gamma: 0.95
   kld_weight: 0.00025
   manual_seed: 1000
 
 trainer_params:
-  gpus: [ ]
-  max_epochs: 10
+  gpus: [2]
+  max_epochs: 20
 
 logging_params:
   save_dir: "logs/"

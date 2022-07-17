@@ -1,0 +1,17 @@
+
+Test mnist set: Accuracy: 8863/10000 (88.6300%)
+
+
+Test CIFAR10 set: Accuracy: 2027/10000 (20.2700%)
+
+Mahalanobis distance Test mnist set: Accuracy: 6182/10000 (61.8200%)
+
+
+Mahalanobis distance Test cifar10 set: Accuracy: 9930/10000 (99.3000%)
+
+
+Mahalanobis distance Test mnist set: Accuracy: 9643/10000 (96.4300%)
+
+
+Mahalanobis distance Test cifar10 set: Accuracy: 9448/10000 (94.4800%)
+

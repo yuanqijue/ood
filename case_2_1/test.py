@@ -37,7 +37,7 @@ tb_logger = TensorBoardLogger(save_dir=config['logging_params']['save_dir'], nam
 seed_everything(config['exp_params']['manual_seed'], True)
 
 model = VAE(**config['model_params'])
-path = 'logs/VAE_CL/version_40/checkpoints/last.ckpt'
+path = 'logs/VAE_CL/version_42/checkpoints/last.ckpt'
 experiment = VAEXperiment.load_from_checkpoint(checkpoint_path=path, vae_model=model, params=config['exp_params'])
 network = experiment.model
 network.eval()
@@ -54,28 +54,39 @@ test_loader = DataLoader(test_data, batch_size=batch_size)
 threshold = 0
 num_samples = 128
 
-train_max_log_px = -793.9294311346123
+# train_max_log_px = -793.9294311346123
 
-# with torch.no_grad():
-#     for data, target in train_loader:
-#         log_px = network.log_marginal_likelihood(data, num_samples)
-#         max_log_px = np.max(log_px)
-#         if max_log_px > train_max_log_px:
-#             train_max_log_px = max_log_px
+correct, total = 0, 0
+with torch.no_grad():
+    for data, target in train_loader:
+        total += target.shape[0]
+        log_px = network.log_marginal_likelihood(data, num_samples)
+        print('p(x) in train MNIST', np.mean(log_px))
+        if total >= batch_size * 10:
+            break
 
-print('Maximum log p(x) is:', train_max_log_px)
+# print('Maximum log p(x) is:', train_max_log_px)
 
 correct, total = 0, 0
 with torch.no_grad():
     for data, target in test_loader:
         total += target.shape[0]
         log_px = network.log_marginal_likelihood(data, num_samples)
-        px = network.marginal_likelihood(log_px, train_max_log_px)
-        print(px)
+        print('p(x) in test MNIST', np.mean(log_px))
+        if total >= batch_size * 10:
+            break
 
-print('\nTest mnist set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, total, 100. * correct / total))
+# print('\nTest mnist set: Accuracy: {}/{} ({:.4f}%)\n'.format(correct, total, 100. * correct / total))
 
 train_transform = transforms.Compose([transforms.Resize(size=28), transforms.Grayscale(), transforms.ToTensor(),
                                       Normalize(mean=(0.4841,), std=(0.2313,))])
 test_data = datasets.CIFAR10(root="../data", train=False, download=True, transform=train_transform)
 test_loader = DataLoader(test_data, batch_size=batch_size)
+correct, total = 0, 0
+with torch.no_grad():
+    for data, target in test_loader:
+        total += target.shape[0]
+        log_px = network.log_marginal_likelihood(data, num_samples)
+        print('p(x) in test CIFAR10', np.mean(log_px))
+        if total >= batch_size * 10:
+            break
